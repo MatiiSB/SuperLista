@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  manifest: "/manifest.webmanifest",
   title: {
     default: "SuperLista",
     template: "%s · SuperLista",
@@ -25,6 +27,18 @@ export const metadata: Metadata = {
   authors: [{ name: "SuperLista" }],
   keywords: ["lista de compras", "supermercado", "compras", "nfc", "pwa"],
   formatDetection: { telephone: false },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SuperLista",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/favicon-16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -57,6 +71,7 @@ export default function RootLayout({
           <TooltipProvider>
             {children}
             <Toaster />
+            <InstallPrompt />
           </TooltipProvider>
         </ThemeProvider>
       </body>
