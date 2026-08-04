@@ -34,6 +34,9 @@ export function LoginCard({ error }: { error?: string }) {
     }
     // On success Supabase redirects the browser to the OAuth provider.
   }
+  "use client";
+
+  console.log(window.location.origin);
 
   async function handleEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
