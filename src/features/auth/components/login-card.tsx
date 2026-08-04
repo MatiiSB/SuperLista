@@ -34,23 +34,15 @@ export function LoginCard({ error }: { error?: string }) {
     }
     // On success Supabase redirects the browser to the OAuth provider.
   }
-  "use client";
-
-  console.log(window.location.origin);
-
   async function handleEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    alert("HANDLE EMAIL");
 
-    console.log("HANDLE EMAIL");
     const parsed = emailSchema.safeParse(email);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Email inválido");
       return;
     }
     setLoading("email");
-    console.log("URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log("KEY:", process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.slice(0, 20));
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: parsed.data,
