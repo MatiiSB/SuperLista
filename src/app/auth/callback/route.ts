@@ -1,21 +1,32 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * OAuth / magic-link callback. Exchanges the `code` for a session (PKCE) and
- * redirects to `next` (defaults to "/"), or back to /login on error.
- */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
+
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") ?? "/";
 
+  console.log("===== AUTH CALLBACK =====");
+  console.log("URL:", request.url);
+  console.log("CODE:", code);
+  console.log("NEXT:", next);
+
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    console.log("DATA:", data);
+    console.log("ERROR:", error);
+
     if (!error) {
+      console.log("LOGIN OK");
+
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
+
+    console.error("LOGIN ERROR:", error);
   }
 
   return NextResponse.redirect(new URL("/login?error=auth", requestUrl.origin));
