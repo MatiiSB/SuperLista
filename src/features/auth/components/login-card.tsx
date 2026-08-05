@@ -5,35 +5,22 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GoogleIcon, AppleIcon } from "./brand-icons";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 const emailSchema = z.email("Email inválido");
 
-function redirectTo(): string {
-  return `${window.location.origin}/auth/callback`;
+function redirectTo(next?: string): string {
+  const base = `${window.location.origin}/auth/callback`;
+  return next ? `${base}?next=${encodeURIComponent(next)}` : base;
 }
 
-type LoadingState = "google" | "apple" | "email" | null;
+type LoadingState = "email" | null;
 
-export function LoginCard({ error }: { error?: string }) {
+export function LoginCard({ error, next }: { error?: string; next?: string }) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState<LoadingState>(null);
 
-  async function handleOAuth(provider: "google" | "apple") {
-    setLoading(provider);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: redirectTo() },
-    });
-    if (error) {
-      toast.error(`No se pudo iniciar sesión con ${provider}.`);
-      setLoading(null);
-    }
-    // On success Supabase redirects the browser to the OAuth provider.
-  }
   async function handleEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -46,7 +33,7 @@ export function LoginCard({ error }: { error?: string }) {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: parsed.data,
-      options: { emailRedirectTo: redirectTo() },
+      options: { emailRedirectTo: redirectTo(next) },
     });
     if (error) {
       toast.error("No se pudo enviar el enlace. Intenta de nuevo.");
@@ -61,7 +48,9 @@ export function LoginCard({ error }: { error?: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col items-center gap-1 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">SuperLista</h1>
-        <p className="text-muted-foreground text-sm">Entra para ver y editar tus listas</p>
+        <p className="text-muted-foreground text-sm">
+          Entra para ver y editar tus listas
+        </p>
       </div>
 
       {error === "auth" && (
@@ -69,31 +58,6 @@ export function LoginCard({ error }: { error?: string }) {
           No se pudo completar el acceso. Intenta de nuevo.
         </p>
       )}
-
-      <div className="flex flex-col gap-3">
-        <Button
-          variant="outline"
-          disabled={loading !== null}
-          onClick={() => void handleOAuth("google")}
-        >
-          <GoogleIcon className="size-4" />
-          Continuar con Google
-        </Button>
-        <Button
-          variant="outline"
-          disabled={loading !== null}
-          onClick={() => void handleOAuth("apple")}
-        >
-          <AppleIcon className="size-4" />
-          Continuar con Apple
-        </Button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        <div className="bg-border h-px flex-1" />
-        <span className="text-muted-foreground text-xs uppercase">o</span>
-        <div className="bg-border h-px flex-1" />
-      </div>
 
       <form onSubmit={handleEmail} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">

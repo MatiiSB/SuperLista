@@ -25,8 +25,10 @@ export default async function JoinPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Not authenticated — redirect to login.
-  if (!user) redirect("/login");
+  // Not authenticated — redirect to login, preserving the join destination.
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(`/join/${code}`)}`);
+  }
 
   let workspace: Workspace | null = null;
   let errored = false;
