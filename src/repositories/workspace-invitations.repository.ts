@@ -56,14 +56,3 @@ export async function revokeInvitation(invitationId: string): Promise<void> {
 
   if (error) throw error;
 }
-
-/** Delete an invitation. */
-export async function deleteInvitation(invitationId: string): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("workspace_invitations")
-    .delete()
-    .eq("id", invitationId);
-
-  if (error) throw error;
-}

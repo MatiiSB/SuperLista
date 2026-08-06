@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspace } from "@/repositories/workspaces.repository";
 import { getListsInWorkspace } from "@/repositories/shopping-lists.repository";
 import { getNfcTags } from "@/repositories/nfc-tags.repository";
 import { getMembers, getUserRole } from "@/repositories/workspace-members.repository";
 import { getInvitations } from "@/repositories/workspace-invitations.repository";
 import { NfcAdmin } from "@/features/nfc/components/nfc-admin";
+import { ListsAdmin } from "@/features/lists/components/lists-admin";
 import { InvitationsAdmin } from "@/features/workspaces/components/invitations-admin";
 import { MembersAdmin } from "@/features/workspaces/components/members-admin";
+import { WorkspaceGeneralAdmin } from "@/features/workspaces/components/workspace-general-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +27,8 @@ export default async function SettingsPage({
 
   if (!user) notFound();
 
-  const [role, lists, nfcTags, invitations, members] = await Promise.all([
+  const [workspace, role, lists, nfcTags, invitations, members] = await Promise.all([
+    getWorkspace(workspaceId),
     getUserRole(workspaceId, user.id),
     getListsInWorkspace(workspaceId),
     getNfcTags(workspaceId),
@@ -32,18 +36,26 @@ export default async function SettingsPage({
     getMembers(workspaceId),
   ]);
 
-  if (!role) notFound();
+  if (!workspace || !role) notFound();
 
   const isOwner = role === "OWNER";
+  const canEdit = isOwner || role === "EDITOR";
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Configuración</h1>
         <p className="text-muted-foreground text-sm">
-          Administra etiquetas NFC, invitaciones y miembros.
+          Administra el workspace, sus listas, etiquetas NFC, invitaciones y
+          miembros.
         </p>
       </header>
+
+      {isOwner && (
+        <WorkspaceGeneralAdmin workspaceId={workspaceId} name={workspace.name} />
+      )}
+
+      <ListsAdmin lists={lists} canEdit={canEdit} canDelete={isOwner} />
 
       {isOwner && <NfcAdmin tags={nfcTags} lists={lists} />}
 

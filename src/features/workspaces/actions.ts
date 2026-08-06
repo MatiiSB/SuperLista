@@ -1,11 +1,11 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, ActionResultWithData } from "@/types/list";
 import type { Workspace, WorkspaceRole } from "@/types/workspace";
 import { createWorkspace, joinWorkspace } from "@/services/workspace.service";
+import { deleteWorkspace } from "@/repositories/workspaces.repository";
 import { updateMemberRole, removeMember } from "@/repositories/workspace-members.repository";
 import {
   createInvitation,
@@ -86,6 +86,27 @@ export async function updateWorkspaceAction(
   }
 }
 
+/**
+ * Delete a workspace (owner only, enforced by RLS). Cascades to members, lists,
+ * items, invitations, NFC tags and audit logs (FK on delete cascade).
+ * Returns ok — the client navigates to "/" which lands on the next workspace.
+ * No refresh(): we leave this route entirely. No audit: the cascade wipes the
+ * workspace's audit rows alongside it.
+ */
+export async function deleteWorkspaceAction(
+  workspaceId: string,
+): Promise<ActionResult> {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) return { ok: false, error: "No autenticado" };
+
+  try {
+    await deleteWorkspace(workspaceId);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "No se pudo eliminar el workspace" };
+  }
+}
+
 /** Change a member's role (owner only, enforced by RLS). */
 export async function updateMemberRoleAction(
   workspaceId: string,
@@ -119,13 +140,6 @@ export async function removeMemberAction(
   } catch {
     return { ok: false, error: "No se pudo remover el miembro" };
   }
-}
-
-/** Redirect to a workspace's default list. */
-export async function redirectToWorkspaceAction(
-  workspaceId: string,
-): Promise<void> {
-  redirect(`/w/${workspaceId}`);
 }
 
 // ── Invitation management (owner only, enforced by RLS) ──────────────────────

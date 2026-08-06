@@ -111,3 +111,14 @@ export async function getWorkspace(
   if (error) throw error;
   return data as Workspace | null;
 }
+
+/**
+ * Delete a workspace. Only the owner can do this (enforced by RLS).
+ * Cascades to members, lists, items, invitations and NFC tags (FK on delete cascade).
+ */
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("workspaces").delete().eq("id", workspaceId);
+
+  if (error) throw error;
+}

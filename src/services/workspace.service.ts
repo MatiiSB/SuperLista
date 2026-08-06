@@ -126,21 +126,6 @@ export async function joinWorkspace(
   return ws;
 }
 
-/** Look up a workspace by invite code (admin client, for display before joining). */
-export async function getWorkspaceByInviteCode(
-  inviteCode: string,
-): Promise<Workspace | null> {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("workspaces")
-    .select("id, name, description, image_url")
-    .eq("invite_code", inviteCode)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data as Workspace | null;
-}
-
 /**
  * Join a workspace via a UUID invitation token. Validates the token (not
  * revoked, not expired, under max_uses), adds the user as a member with the
