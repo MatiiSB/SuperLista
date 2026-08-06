@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspace } from "@/repositories/workspaces.repository";
+import { getWorkspace, getCategoryOrder } from "@/repositories/workspaces.repository";
 import { getListsInWorkspace } from "@/repositories/shopping-lists.repository";
 import { getNfcTags } from "@/repositories/nfc-tags.repository";
 import { getMembers, getUserRole } from "@/repositories/workspace-members.repository";
@@ -12,6 +12,7 @@ import { NfcAdmin } from "@/features/nfc/components/nfc-admin";
 import { ListsAdmin } from "@/features/lists/components/lists-admin";
 import { InvitationsAdmin } from "@/features/workspaces/components/invitations-admin";
 import { MembersAdmin } from "@/features/workspaces/components/members-admin";
+import { CategoryOrderAdmin } from "@/features/workspaces/components/category-order-admin";
 import { WorkspaceGeneralAdmin } from "@/features/workspaces/components/workspace-general-admin";
 
 export const dynamic = "force-dynamic";
@@ -30,13 +31,14 @@ export default async function SettingsPage({
 
   if (!user) notFound();
 
-  const [workspace, role, lists, nfcTags, invitations, members] = await Promise.all([
+  const [workspace, role, lists, nfcTags, invitations, members, categoryOrder] = await Promise.all([
     getWorkspace(workspaceId),
     getUserRole(workspaceId, user.id),
     getListsInWorkspace(workspaceId),
     getNfcTags(workspaceId),
     getInvitations(workspaceId),
     getMembers(workspaceId),
+    getCategoryOrder(workspaceId),
   ]);
 
   if (!workspace || !role) notFound();
@@ -67,6 +69,10 @@ export default async function SettingsPage({
       )}
 
       <ListsAdmin lists={lists} canEdit={canEdit} canDelete={isOwner} />
+
+      {isOwner && (
+        <CategoryOrderAdmin workspaceId={workspaceId} order={categoryOrder} />
+      )}
 
       {isOwner && <NfcAdmin tags={nfcTags} lists={lists} />}
 

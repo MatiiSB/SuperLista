@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useState, useOptimistic, useTransition } from "react";
 import { toast } from "sonner";
 import { Eraser, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,21 @@ import {
   clearCheckedAction,
   deleteItemAction,
   toggleItemAction,
+  setProductCategoryAction,
 } from "@/features/lists/actions";
 import { useShoppingItems } from "@/hooks/use-shopping-items";
 import { useListPreferences } from "@/store/list-preferences";
+import {
+  type CategoryMap,
+  normalizeName,
+  resolveCategory,
+} from "@/features/lists/categories";
 import type { ShoppingItem, ShoppingList, ListItemInput } from "@/types/list";
-import { ListItemRow } from "./list-item-row";
 import { AddItemForm } from "./add-item-form";
 import { EmptyState } from "./empty-state";
+import { SearchBar } from "./search-bar";
+import { CategoryGroups } from "./category-groups";
+import { CategoryPicker } from "./category-picker";
 
 // ── Optimistic reducer ──────────────────────────────────────────────────────
 
@@ -50,11 +58,17 @@ export function ShoppingList({
   items: initialItems,
   guestMode = false,
   guestJwt,
+  categoryMap,
+  categoryOrder,
+  canEdit,
 }: {
   list: ShoppingList;
   items: ShoppingItem[];
   guestMode?: boolean;
   guestJwt?: string;
+  categoryMap: CategoryMap;
+  categoryOrder: string[] | null;
+  canEdit: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [baseItems, setBaseItems] = useShoppingItems(
@@ -70,11 +84,21 @@ export function ShoppingList({
   const { hideChecked, sortCheckedBottom, toggleHideChecked } =
     useListPreferences();
 
+  // Search query + category picker state.
+  const [query, setQuery] = useState("");
+  const [pickerName, setPickerName] = useState<string | null>(null);
+
   const checkedCount = optimisticItems.filter((i) => i.checked).length;
 
-  // Apply preferences: filter and sort.
+  // ── Visibility pipeline ───────────────────────────────────────────────────
+  const normalizedQuery = normalizeName(query);
   const visibleItems = optimisticItems
     .filter((item) => !hideChecked || !item.checked)
+    .filter(
+      (item) =>
+        !normalizedQuery ||
+        normalizeName(item.custom_name).includes(normalizedQuery),
+    )
     .toSorted((a, b) => {
       if (!sortCheckedBottom) return 0;
       return Number(a.checked) - Number(b.checked);
@@ -104,7 +128,6 @@ export function ShoppingList({
       updateOptimistic({ type: "add", item: tempItem });
       const result = await addItemAction(list.id, input);
       if (result.ok) {
-        // Replace temp item with the real item from the DB.
         const realItem = result.data;
         setBaseItems((prev) => {
           const filtered = prev.filter(
@@ -112,6 +135,11 @@ export function ShoppingList({
           );
           return [...filtered, realItem];
         });
+        // Prompt for a category when the product is uncategorizable and the
+        // user can edit (guests and viewers skip — they get auto/otros).
+        if (canEdit && resolveCategory(input.name, categoryMap) === null) {
+          setPickerName(input.name);
+        }
       } else {
         toast.error(result.error);
       }
@@ -164,6 +192,21 @@ export function ShoppingList({
     });
   }
 
+  async function handlePickCategory(slug: string) {
+    if (!pickerName) return;
+    const result = await setProductCategoryAction(
+      list.workspace_id,
+      pickerName,
+      slug,
+    );
+    if (result.ok) {
+      toast.success("Categoría guardada");
+      setPickerName(null);
+    } else {
+      toast.error(result.error);
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -204,27 +247,40 @@ export function ShoppingList({
         </div>
       </header>
 
+      {/* Search */}
+      <SearchBar value={query} onChange={setQuery} />
+
       {/* Items */}
       <div className="flex flex-1 flex-col">
-        {visibleItems.length === 0 ? (
+        {optimisticItems.length === 0 ? (
           <EmptyState />
+        ) : visibleItems.length === 0 ? (
+          <p className="text-muted-foreground py-10 text-center text-sm">
+            No se encontraron productos.
+          </p>
         ) : (
-          <ul className="flex flex-col divide-y">
-            {visibleItems.map((item) => (
-              <li key={item.id}>
-                <ListItemRow
-                  item={item}
-                  onToggle={handleToggle}
-                  onDelete={handleDelete}
-                />
-              </li>
-            ))}
-          </ul>
+          <CategoryGroups
+            items={visibleItems}
+            categoryMap={categoryMap}
+            categoryOrder={categoryOrder}
+            canEdit={canEdit}
+            onToggle={handleToggle}
+            onDelete={handleDelete}
+            onPickCategory={setPickerName}
+          />
         )}
       </div>
 
       {/* Add form */}
       <AddItemForm onAdd={handleAdd} disabled={isPending} />
+
+      {/* Category picker overlay */}
+      <CategoryPicker
+        open={pickerName !== null}
+        onOpenChange={(open) => !open && setPickerName(null)}
+        productName={pickerName ?? ""}
+        onSelect={handlePickCategory}
+      />
     </main>
   );
 }

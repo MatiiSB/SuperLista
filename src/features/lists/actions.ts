@@ -23,6 +23,8 @@ import {
   deleteList,
   updateList,
 } from "@/repositories/shopping-lists.repository";
+import { upsertProductCategory } from "@/repositories/product-categories.repository";
+import { normalizeName } from "@/features/lists/categories";
 import {
   guestAddItem,
   guestClearChecked,
@@ -282,5 +284,33 @@ export async function deleteListAction(listId: string): Promise<ActionResult> {
     return { ok: true };
   } catch {
     return { ok: false, error: "No se pudo eliminar la lista" };
+  }
+}
+
+/** Set the learned category for a product name (authenticated users only). */
+export async function setProductCategoryAction(
+  workspaceId: string,
+  name: string,
+  categorySlug: string,
+): Promise<ActionResult> {
+  const ctx = await getRequestContext();
+  if (ctx.kind !== "user") return { ok: false, error: "No autenticado" };
+
+  const normalized = normalizeName(name);
+  if (!normalized) return { ok: false, error: "Nombre inválido" };
+
+  try {
+    await upsertProductCategory(workspaceId, normalized, categorySlug);
+    recordAudit({
+      ...auditActor(ctx),
+      workspaceId,
+      action: "product.categorize",
+      entityType: "product_categories",
+      metadata: { name: normalized, category: categorySlug },
+    });
+    refresh();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "No se pudo guardar la categoría" };
   }
 }

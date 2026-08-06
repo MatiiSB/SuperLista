@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getListsInWorkspace, getList } from "@/repositories/shopping-lists.repository";
 import { getItems } from "@/repositories/shopping-items.repository";
 import { getUserRole } from "@/repositories/workspace-members.repository";
+import { getCategoryMap } from "@/repositories/product-categories.repository";
+import { getCategoryOrder } from "@/repositories/workspaces.repository";
 import { ShoppingList as ShoppingListComponent } from "@/features/lists/components/shopping-list";
 import { ListSelector } from "@/features/lists/components/list-selector";
 
@@ -22,16 +24,18 @@ export default async function ListPage({
 
   if (!user) notFound();
 
-  const [lists, list, items, role] = await Promise.all([
+  const [lists, list, items, role, categoryMap, categoryOrder] = await Promise.all([
     getListsInWorkspace(workspaceId),
     getList(listId),
     getItems(listId),
     getUserRole(workspaceId, user.id),
+    getCategoryMap(workspaceId),
+    getCategoryOrder(workspaceId),
   ]);
 
   if (!list) notFound();
 
-  const canCreate = role === "OWNER" || role === "EDITOR";
+  const canEdit = role === "OWNER" || role === "EDITOR";
 
   return (
     <>
@@ -40,10 +44,16 @@ export default async function ListPage({
           lists={lists}
           activeId={listId}
           workspaceId={workspaceId}
-          canCreate={canCreate}
+          canCreate={canEdit}
         />
       </div>
-      <ShoppingListComponent list={list} items={items} />
+      <ShoppingListComponent
+        list={list}
+        items={items}
+        categoryMap={categoryMap}
+        categoryOrder={categoryOrder}
+        canEdit={canEdit}
+      />
     </>
   );
 }

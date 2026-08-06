@@ -11,6 +11,8 @@ export interface Workspace {
   image_url: string | null;
   owner_id: string;
   invite_code: string;
+  /** Custom supermarket category order (slugs). null = use the default order. */
+  category_order: string[] | null;
   created_at: string;
   updated_at: string;
 }

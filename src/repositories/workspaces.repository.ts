@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server-admin";
 import type { Workspace, WorkspaceSummary } from "@/types/workspace";
 
 /**
@@ -119,6 +120,50 @@ export async function getWorkspace(
 export async function deleteWorkspace(workspaceId: string): Promise<void> {
   const supabase = await createClient();
   const { error } = await supabase.from("workspaces").delete().eq("id", workspaceId);
+
+  if (error) throw error;
+}
+
+/** Get the workspace's custom category order, or null for the default. */
+export async function getCategoryOrder(
+  workspaceId: string,
+): Promise<string[] | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("category_order")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.category_order as string[] | null) ?? null;
+}
+
+/** Same as getCategoryOrder but via the admin client (for NFC guests). */
+export async function getCategoryOrderForGuest(
+  workspaceId: string,
+): Promise<string[] | null> {
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("category_order")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.category_order as string[] | null) ?? null;
+}
+
+/** Update the workspace's category order (owner only, enforced by RLS). */
+export async function updateCategoryOrder(
+  workspaceId: string,
+  order: string[],
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ category_order: order })
+    .eq("id", workspaceId);
 
   if (error) throw error;
 }

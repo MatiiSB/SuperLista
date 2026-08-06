@@ -3,6 +3,8 @@ import { createGuestSession } from "@/services/guest-session.service";
 import { signGuestJwt } from "@/lib/auth/guest-jwt";
 import { recordAudit } from "@/services/audit.service";
 import { GuestListWrapper } from "@/features/nfc/components/guest-list-wrapper";
+import { getCategoryMapForGuest } from "@/repositories/product-categories.repository";
+import { getCategoryOrderForGuest } from "@/repositories/workspaces.repository";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +41,11 @@ export default async function NfcPage({
     metadata: { shopping_list_id: resolved.list.id },
   });
 
-  const items = await getItemsForGuest(resolved.list.id);
+  const [items, categoryMap, categoryOrder] = await Promise.all([
+    getItemsForGuest(resolved.list.id),
+    getCategoryMapForGuest(resolved.list.workspace_id),
+    getCategoryOrderForGuest(resolved.list.workspace_id),
+  ]);
 
   return (
     <GuestListWrapper
@@ -47,6 +53,8 @@ export default async function NfcPage({
       items={items}
       guestJwt={guestJwt}
       sessionToken={session.token}
+      categoryMap={categoryMap}
+      categoryOrder={categoryOrder}
     />
   );
 }

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, ActionResultWithData } from "@/types/list";
 import type { Workspace, WorkspaceRole } from "@/types/workspace";
 import { createWorkspace, joinWorkspace } from "@/services/workspace.service";
-import { deleteWorkspace } from "@/repositories/workspaces.repository";
+import { deleteWorkspace, updateCategoryOrder } from "@/repositories/workspaces.repository";
 import { updateMemberRole, removeMember } from "@/repositories/workspace-members.repository";
 import {
   createInvitation,
@@ -104,6 +104,31 @@ export async function deleteWorkspaceAction(
     return { ok: true };
   } catch {
     return { ok: false, error: "No se pudo eliminar el workspace" };
+  }
+}
+
+/** Update the workspace's supermarket category order (owner only, RLS-enforced). */
+export async function updateCategoryOrderAction(
+  workspaceId: string,
+  order: string[],
+): Promise<ActionResult> {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) return { ok: false, error: "No autenticado" };
+
+  try {
+    await updateCategoryOrder(workspaceId, order);
+    recordAudit({
+      actorType: "user",
+      actorId: userId,
+      workspaceId,
+      action: "workspace.category_order",
+      entityType: "workspaces",
+      entityId: workspaceId,
+    });
+    refresh();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "No se pudo guardar el orden" };
   }
 }
 
