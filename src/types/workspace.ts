@@ -21,6 +21,9 @@ export interface WorkspaceMember {
   user_id: string;
   role: WorkspaceRole;
   joined_at: string;
+  /** Display fields enriched from public.profiles (nullable, not on the row). */
+  email?: string | null;
+  full_name?: string | null;
 }
 
 /** Workspace with the current user's role and member count (for switcher UI). */

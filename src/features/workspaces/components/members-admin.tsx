@@ -76,6 +76,16 @@ function MemberRow({
   // Don't allow changing your own role or removing yourself.
   const canManage = isOwner && !isCurrentUser;
 
+  // Display identity: never show the raw user_id. Prefer full_name, then email,
+  // then a neutral fallback. The current user is always "Vos".
+  const displayName = isCurrentUser
+    ? "Vos"
+    : (member.full_name ?? member.email ?? "Miembro");
+  // Show the email as secondary when it isn't already the primary label.
+  const emailSecondary =
+    member.email && member.email !== displayName ? member.email : null;
+  const dateLabel = new Date(member.joined_at).toLocaleDateString("es");
+
   async function handleRoleChange(newRole: WorkspaceRole) {
     setRole(newRole);
     setSaving(true);
@@ -106,11 +116,9 @@ function MemberRow({
   return (
     <div className="flex items-center gap-3 rounded-lg border p-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">
-          {isCurrentUser ? "Vos" : member.user_id.slice(0, 8)}
-        </p>
-        <p className="text-muted-foreground text-xs">
-          {new Date(member.joined_at).toLocaleDateString("es")}
+        <p className="truncate text-sm font-medium">{displayName}</p>
+        <p className="text-muted-foreground truncate text-xs">
+          {emailSecondary ?? dateLabel}
         </p>
       </div>
       {canManage ? (

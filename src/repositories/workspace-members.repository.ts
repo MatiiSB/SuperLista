@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server-admin";
 import type { WorkspaceMember, WorkspaceRole } from "@/types/workspace";
 
 /**
@@ -6,7 +7,7 @@ import type { WorkspaceMember, WorkspaceRole } from "@/types/workspace";
  * and only owners can manage.
  */
 
-/** Get all members of a workspace. */
+/** Get all members of a workspace, enriched with profile display fields. */
 export async function getMembers(
   workspaceId: string,
 ): Promise<WorkspaceMember[]> {
@@ -18,7 +19,33 @@ export async function getMembers(
     .order("joined_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as WorkspaceMember[];
+  const members = (data ?? []) as WorkspaceMember[];
+  if (members.length === 0) return members;
+
+  // Profiles are RLS-locked to self (auth.uid() = id), so the regular client
+  // can only read the current user's own profile. Use the admin client to
+  // enrich the other members' display fields. The membership read above stays
+  // RLS-gated — only members reach this point.
+  const userIds = members.map((m) => m.user_id);
+  const admin = createAdminClient();
+  const { data: profiles, error: profileError } = await admin
+    .from("profiles")
+    .select("id, email, full_name")
+    .in("id", userIds);
+
+  if (profileError) throw profileError;
+
+  const profileById = new Map(
+    (profiles ?? []).map((p) => [p.id as string, p]),
+  );
+  return members.map((m) => {
+    const profile = profileById.get(m.user_id);
+    return {
+      ...m,
+      email: profile?.email ?? null,
+      full_name: profile?.full_name ?? null,
+    };
+  });
 }
 
 /** Get the user's role in a workspace, or null if not a member. */

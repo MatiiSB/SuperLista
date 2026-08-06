@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspace } from "@/repositories/workspaces.repository";
 import { getListsInWorkspace } from "@/repositories/shopping-lists.repository";
@@ -43,12 +46,20 @@ export default async function SettingsPage({
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Configuración</h1>
-        <p className="text-muted-foreground text-sm">
-          Administra el workspace, sus listas, etiquetas NFC, invitaciones y
-          miembros.
-        </p>
+      <header className="flex flex-col gap-2">
+        <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
+          <Link href={`/w/${workspaceId}`}>
+            <ArrowLeft className="size-4" />
+            Volver
+          </Link>
+        </Button>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Configuración</h1>
+          <p className="text-muted-foreground text-sm">
+            Administra el workspace, sus listas, etiquetas NFC, invitaciones y
+            miembros.
+          </p>
+        </div>
       </header>
 
       {isOwner && (
