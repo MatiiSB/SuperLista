@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useOptimistic, useTransition } from "react";
+import { useMemo, useState, useOptimistic, useTransition } from "react";
 import { toast } from "sonner";
 import { Eraser, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,16 @@ export function ShoppingList({
   const [query, setQuery] = useState("");
   const [pickerName, setPickerName] = useState<string | null>(null);
 
+  // Optimistic overrides for learned categories. When the user picks a category
+  // we apply it here immediately so the grouping updates before the server
+  // re-render (refresh()) delivers a fresh categoryMap prop — otherwise items
+  // stay in their old group until a full reload. Reverted on failure.
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, string>>({});
+  const categoryMapResolved = useMemo<CategoryMap>(
+    () => ({ ...categoryMap, ...categoryOverrides }),
+    [categoryMap, categoryOverrides],
+  );
+
   const checkedCount = optimisticItems.filter((i) => i.checked).length;
 
   // ── Visibility pipeline ───────────────────────────────────────────────────
@@ -137,7 +147,7 @@ export function ShoppingList({
         });
         // Prompt for a category when the product is uncategorizable and the
         // user can edit (guests and viewers skip — they get auto/otros).
-        if (canEdit && resolveCategory(input.name, categoryMap) === null) {
+        if (canEdit && resolveCategory(input.name, categoryMapResolved) === null) {
           setPickerName(input.name);
         }
       } else {
@@ -193,17 +203,28 @@ export function ShoppingList({
   }
 
   async function handlePickCategory(slug: string) {
-    if (!pickerName) return;
-    const result = await setProductCategoryAction(
-      list.workspace_id,
-      pickerName,
-      slug,
-    );
+    const name = pickerName;
+    if (!name) return;
+    const normalized = normalizeName(name);
+
+    // Apply the pick optimistically and close the picker before the await.
+    // Closing now prevents a double-tap from firing the action twice
+    // concurrently — which raced the SELECT→INSERT in upsertProductCategory
+    // and raised 23505. The optimistic override also fixes the stale
+    // categoryMap: the item moves to the new group immediately.
+    setCategoryOverrides((prev) => ({ ...prev, [normalized]: slug }));
+    setPickerName(null);
+
+    const result = await setProductCategoryAction(list.workspace_id, name, slug);
     if (result.ok) {
       toast.success("Categoría guardada");
-      setPickerName(null);
     } else {
       toast.error(result.error);
+      setCategoryOverrides((prev) => {
+        const next = { ...prev };
+        delete next[normalized];
+        return next;
+      });
     }
   }
 
@@ -261,7 +282,7 @@ export function ShoppingList({
         ) : (
           <CategoryGroups
             items={visibleItems}
-            categoryMap={categoryMap}
+            categoryMap={categoryMapResolved}
             categoryOrder={categoryOrder}
             canEdit={canEdit}
             onToggle={handleToggle}

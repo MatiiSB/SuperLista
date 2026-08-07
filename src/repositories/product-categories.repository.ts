@@ -71,23 +71,39 @@ export async function upsertProductCategory(
 
   if (selectError) throw selectError;
 
-  if (!existing) {
-    // 2a. Insert — gated by the "Editors insert product categories" policy.
-    const { error: insertError } = await supabase
+  if (existing) {
+    // 2a. Update the existing mapping — gated by the "Editors update product
+    // categories" policy (USING + WITH CHECK is_workspace_editor).
+    const { error: updateError } = await supabase
       .from("product_categories")
-      .insert({
-        workspace_id: workspaceId,
-        name_normalized: nameNormalized,
-        category_slug: categorySlug,
-      });
-    if (insertError) throw insertError;
+      .update({ category_slug: categorySlug })
+      .eq("id", existing.id);
+    if (updateError) throw updateError;
     return;
   }
 
-  // 2b. Update — gated by the "Editors update product categories" policy.
-  const { error: updateError } = await supabase
+  // 2b. Insert — gated by the "Editors insert product categories" policy.
+  const { error: insertError } = await supabase
+    .from("product_categories")
+    .insert({
+      workspace_id: workspaceId,
+      name_normalized: nameNormalized,
+      category_slug: categorySlug,
+    });
+  if (!insertError) return;
+
+  // 2c. A concurrent insert raced between our SELECT and INSERT and created
+  // the row (unique violation 23505). Fall back to updating that now-existing
+  // row by its natural key. This is the concurrency-safe equivalent of
+  // ON CONFLICT DO UPDATE, kept as separate statements so each triggers a
+  // single RLS policy check (a single .upsert() re-applies both the INSERT
+  // and UPDATE policies in one statement and can raise 42501).
+  if (insertError.code !== "23505") throw insertError;
+
+  const { error: raceUpdateError } = await supabase
     .from("product_categories")
     .update({ category_slug: categorySlug })
-    .eq("id", existing.id);
-  if (updateError) throw updateError;
+    .eq("workspace_id", workspaceId)
+    .eq("name_normalized", nameNormalized);
+  if (raceUpdateError) throw raceUpdateError;
 }
