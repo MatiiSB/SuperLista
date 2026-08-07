@@ -10,6 +10,7 @@ import type {
 } from "@/types/list";
 import { getRequestContext } from "@/lib/auth/request-context";
 import type { RequestContext } from "@/lib/auth/request-context";
+import { createClient } from "@/lib/supabase/server";
 import { recordAudit, type AuditActorType } from "@/services/audit.service";
 import {
   addItem,
@@ -300,6 +301,33 @@ export async function setProductCategoryAction(
   if (!normalized) return { ok: false, error: "Nombre inválido" };
 
   try {
+    // TEMP DEBUG — diagnose which RLS precondition fails.
+    // Same cookie client the upsert uses → same auth.uid() RLS sees.
+    const dbg = await createClient();
+    const { data: { user: dbgUser } } = await dbg.auth.getUser();
+    const authUid = dbgUser?.id ?? null;
+    const { data: isEditorForAuthUid } = await dbg.rpc("is_workspace_editor", {
+      p_workspace_id: workspaceId,
+      p_user_id: authUid,
+    });
+    const { data: isMemberForAuthUid } = await dbg.rpc("is_workspace_member", {
+      p_workspace_id: workspaceId,
+      p_user_id: authUid,
+    });
+    const { data: isEditorForCtxUserId } = await dbg.rpc("is_workspace_editor", {
+      p_workspace_id: workspaceId,
+      p_user_id: ctx.userId,
+    });
+    console.error("[setProductCategoryAction] RLS diagnostic", {
+      authUid,
+      ctxUserId: ctx.userId,
+      authUidEqualsCtxUserId: authUid === ctx.userId,
+      workspaceId,
+      isEditorForAuthUid,
+      isMemberForAuthUid,
+      isEditorForCtxUserId,
+    });
+
     await upsertProductCategory(workspaceId, normalized, categorySlug);
     recordAudit({
       ...auditActor(ctx),
