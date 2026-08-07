@@ -42,35 +42,52 @@ export async function getCategoryMapForGuest(
   return fetchCategoryMap(createAdminClient(), workspaceId);
 }
 
-/** Upsert a learned product → category mapping (editor+, enforced by RLS). */
+/**
+ * Upsert a learned product → category mapping (editor+, enforced by RLS).
+ *
+ * Implemented as an explicit SELECT → INSERT/UPDATE rather than a single
+ * `.upsert()`. Supabase's `.upsert()` compiles to `INSERT ... ON CONFLICT DO
+ * UPDATE`, whose RLS rewrite applies both the INSERT and UPDATE policies within
+ * one statement and can raise `42501 new row violates row-level security
+ * policy` even when each policy passes individually. Splitting the operation
+ * lets each branch trigger a single, simple policy check (INSERT → insert
+ * WITH CHECK; UPDATE → update USING + WITH CHECK), which are the policies
+ * already verified to pass for workspace editors.
+ */
 export async function upsertProductCategory(
   workspaceId: string,
   nameNormalized: string,
   categorySlug: string,
 ): Promise<void> {
   const supabase = await createClient();
-  const { error } = await supabase
+
+  // 1. Does a learned mapping already exist for this product in this workspace?
+  const { data: existing, error: selectError } = await supabase
     .from("product_categories")
-    .upsert(
-      {
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("name_normalized", nameNormalized)
+    .maybeSingle();
+
+  if (selectError) throw selectError;
+
+  if (!existing) {
+    // 2a. Insert — gated by the "Editors insert product categories" policy.
+    const { error: insertError } = await supabase
+      .from("product_categories")
+      .insert({
         workspace_id: workspaceId,
         name_normalized: nameNormalized,
         category_slug: categorySlug,
-      },
-      { onConflict: "workspace_id,name_normalized" },
-    );
-
-  if (error) {
-    // TEMP DEBUG — full Supabase error (remove after fixing the root cause)
-    console.error("[upsertProductCategory] Supabase error", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      workspaceId,
-      nameNormalized,
-      categorySlug,
-    });
-    throw error;
+      });
+    if (insertError) throw insertError;
+    return;
   }
+
+  // 2b. Update — gated by the "Editors update product categories" policy.
+  const { error: updateError } = await supabase
+    .from("product_categories")
+    .update({ category_slug: categorySlug })
+    .eq("id", existing.id);
+  if (updateError) throw updateError;
 }
