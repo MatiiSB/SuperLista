@@ -310,7 +310,35 @@ export async function setProductCategoryAction(
     });
     refresh();
     return { ok: true };
-  } catch {
-    return { ok: false, error: "No se pudo guardar la categoría" };
+  } catch (err) {
+    // TEMP DEBUG — surface the full Supabase error to server log + client toast.
+    // Remove this verbose block once the root cause is fixed.
+    const e = err as {
+      code?: string;
+      message?: string;
+      details?: string;
+      hint?: string;
+    };
+    console.error("[setProductCategoryAction] failed", {
+      code: e?.code,
+      message: e?.message,
+      details: e?.details,
+      hint: e?.hint,
+      ctxKind: ctx.kind,
+      ctxUserId: ctx.userId,
+      workspaceId,
+      normalized,
+      categorySlug,
+    });
+    const detail = [
+      e?.details && `details: ${e.details}`,
+      e?.hint && `hint: ${e.hint}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return {
+      ok: false,
+      error: `[${e?.code ?? "?"}] ${e?.message ?? String(err)}${detail ? ` · ${detail}` : ""}`,
+    };
   }
 }

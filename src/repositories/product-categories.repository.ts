@@ -60,5 +60,17 @@ export async function upsertProductCategory(
       { onConflict: "workspace_id,name_normalized" },
     );
 
-  if (error) throw error;
+  if (error) {
+    // TEMP DEBUG — full Supabase error (remove after fixing the root cause)
+    console.error("[upsertProductCategory] Supabase error", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      workspaceId,
+      nameNormalized,
+      categorySlug,
+    });
+    throw error;
+  }
 }
